@@ -40,7 +40,7 @@
 #define kIOHIDFKeyModeKey    "HIDFKeyMode"
 #endif
 
-int macosx_ibook_fnswitch(int setting);
+int setFnState(int setting);
 unsigned int enable(void);
 unsigned int disable(void);
 
