@@ -22,72 +22,73 @@
  */
 #include "utils.h"
 
-unsigned int enable()
+unsigned int enable(void)
 {
-    unsigned int res = macosx_ibook_fnswitch(kfntheOtherMode);
-    CFPreferencesSetAppValue( CFSTR("fnState"), kCFBooleanTrue, CFSTR("com.apple.keyboard") );
-    CFPreferencesAppSynchronize( CFSTR("com.apple.keyboard") );
-    
-    NSDictionary *dict = @{@"state": @YES};
-    [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.keyboard.fnstatedidchange" object:NULL userInfo:dict deliverImmediately:YES];
-    
-    return res;
+  unsigned int res = macosx_ibook_fnswitch(kfntheOtherMode);
+  CFPreferencesSetAppValue( CFSTR("fnState"), kCFBooleanTrue, CFSTR("com.apple.keyboard") );
+  CFPreferencesAppSynchronize( CFSTR("com.apple.keyboard") );
+  
+  NSDictionary *dict = @{@"state": @YES};
+  [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.keyboard.fnstatedidchange" object:NULL userInfo:dict deliverImmediately:YES];
+  
+  return res;
 }
 
-unsigned int disable()
+unsigned int disable(void)
 {
-    unsigned int res = macosx_ibook_fnswitch(kfnAppleMode);
-    CFPreferencesSetAppValue( CFSTR("fnState"), kCFBooleanFalse, CFSTR("com.apple.keyboard") );
-    CFPreferencesAppSynchronize( CFSTR("com.apple.keyboard") );
-    
-    NSDictionary *dict = @{@"state": @NO};
-    [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.keyboard.fnstatedidchange" object:NULL userInfo:dict deliverImmediately:YES];
-    
-    return res;
+  unsigned int res = macosx_ibook_fnswitch(kfnAppleMode);
+  CFPreferencesSetAppValue( CFSTR("fnState"), kCFBooleanFalse, CFSTR("com.apple.keyboard") );
+  CFPreferencesAppSynchronize( CFSTR("com.apple.keyboard") );
+  
+  NSDictionary *dict = @{@"state": @NO};
+  [[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.keyboard.fnstatedidchange" object:NULL userInfo:dict deliverImmediately:YES];
+  
+  return res;
 }
 
 int macosx_ibook_fnswitch(int setting)
 {
-    kern_return_t kr;
-    mach_port_t mp;
-    io_service_t so;
-    io_connect_t dp;
-    io_iterator_t it;
-    CFDictionaryRef classToMatch;
-    unsigned int res, dummy;
-    
-    kr = IOMasterPort(bootstrap_port, &mp);
-    if (kr != KERN_SUCCESS) return -1;
-    
-    classToMatch = IOServiceMatching(kIOHIDSystemClass);
-    if (classToMatch == NULL) return -1;
-    
-    kr = IOServiceGetMatchingServices(mp, classToMatch, &it);
-    if (kr != KERN_SUCCESS) return -1;
-    
-    so = IOIteratorNext(it);
-    IOObjectRelease(it);
-    
-    if (!so) return -1;
-    
-    kr = IOServiceOpen(so, mach_task_self(), kIOHIDParamConnectType, &dp);
-    if (kr != KERN_SUCCESS) return -1;
-    
-    kr = IOHIDGetParameter(dp, CFSTR(kIOHIDFKeyModeKey), sizeof(res), &res, (IOByteCount *) &dummy);
-    if (kr != KERN_SUCCESS) {
-        IOServiceClose(dp);
-        return -1;
+  kern_return_t kernel_return;
+  mach_port_t mach_port;
+  io_service_t io_service;
+  io_connect_t io_connect;
+  io_iterator_t io_iterator;
+  
+  CFDictionaryRef classToMatch;
+  unsigned int res, dummy;
+  
+  kernel_return = IOMasterPort(bootstrap_port, &mach_port);
+  if (kernel_return != KERN_SUCCESS) return -1;
+  
+  classToMatch = IOServiceMatching(kIOHIDSystemClass);
+  if (classToMatch == NULL) return -1;
+  
+  kernel_return = IOServiceGetMatchingServices(mach_port, classToMatch, &io_iterator);
+  if (kernel_return != KERN_SUCCESS) return -1;
+  
+  io_service = IOIteratorNext(io_iterator);
+  IOObjectRelease(io_iterator);
+  
+  if (!io_service) return -1;
+  
+  kernel_return = IOServiceOpen(io_service, mach_task_self(), kIOHIDParamConnectType, &io_connect);
+  if (kernel_return != KERN_SUCCESS) return -1;
+  
+  kernel_return = IOHIDGetParameter(io_connect, CFSTR(kIOHIDFKeyModeKey), sizeof(res), &res, (IOByteCount *) &dummy);
+  if (kernel_return != KERN_SUCCESS) {
+    IOServiceClose(io_connect);
+    return -1;
+  }
+  
+  if (setting == kfnAppleMode || setting == kfntheOtherMode) {
+    dummy = setting;
+    kernel_return = IOHIDSetParameter(io_connect, CFSTR(kIOHIDFKeyModeKey), &dummy, sizeof(dummy));
+    if (kernel_return != KERN_SUCCESS) {
+      IOServiceClose(io_connect);
+      return -1;
     }
-    
-    if (setting == kfnAppleMode || setting == kfntheOtherMode) {
-        dummy = setting;
-        kr = IOHIDSetParameter(dp, CFSTR(kIOHIDFKeyModeKey), &dummy, sizeof(dummy));
-        if (kr != KERN_SUCCESS) {
-            IOServiceClose(dp);
-            return -1;
-        }
-    }
-    
-    IOServiceClose(dp);
-    return res;
+  }
+  
+  IOServiceClose(io_connect);
+  return res;
 }

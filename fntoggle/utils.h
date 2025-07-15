@@ -41,7 +41,7 @@
 #endif
 
 int macosx_ibook_fnswitch(int setting);
-unsigned int enable();
-unsigned int disable();
+unsigned int enable(void);
+unsigned int disable(void);
 
 #endif /* utils_h */
