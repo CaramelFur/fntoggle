@@ -18,8 +18,6 @@ int main(int argc, const char * argv[]) {
   else {
     return -1;
   }
-  
-  printf("res: %d\n", res);
   return res;
 }
 

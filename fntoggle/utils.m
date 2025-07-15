@@ -48,47 +48,36 @@ unsigned int disable(void)
 
 int macosx_ibook_fnswitch(int setting)
 {
-  kern_return_t kernel_return;
-  mach_port_t mach_port;
-  io_service_t io_service;
-  io_connect_t io_connect;
-  io_iterator_t io_iterator;
-  
-  CFDictionaryRef classToMatch;
-  unsigned int res, dummy;
-  
-  kernel_return = IOMasterPort(bootstrap_port, &mach_port);
-  if (kernel_return != KERN_SUCCESS) return -1;
-  
-  classToMatch = IOServiceMatching(kIOHIDSystemClass);
+  kern_return_t ret;
+
+  CFDictionaryRef classToMatch = IOServiceMatching(kIOHIDSystemClass);
   if (classToMatch == NULL) return -1;
   
-  kernel_return = IOServiceGetMatchingServices(mach_port, classToMatch, &io_iterator);
-  if (kernel_return != KERN_SUCCESS) return -1;
+  io_iterator_t io_iterator;
+  ret = IOServiceGetMatchingServices(kIOMainPortDefault, classToMatch, &io_iterator);
+  if (ret != KERN_SUCCESS) return -1;
   
+  io_service_t io_service;
   io_service = IOIteratorNext(io_iterator);
   IOObjectRelease(io_iterator);
   
   if (!io_service) return -1;
   
-  kernel_return = IOServiceOpen(io_service, mach_task_self(), kIOHIDParamConnectType, &io_connect);
-  if (kernel_return != KERN_SUCCESS) return -1;
-  
-  kernel_return = IOHIDGetParameter(io_connect, CFSTR(kIOHIDFKeyModeKey), sizeof(res), &res, (IOByteCount *) &dummy);
-  if (kernel_return != KERN_SUCCESS) {
-    IOServiceClose(io_connect);
-    return -1;
-  }
+  io_connect_t io_connect;
+  ret = IOServiceOpen(io_service, mach_task_self(), kIOHIDParamConnectType, &io_connect);
+  if (ret != KERN_SUCCESS) return -1;
   
   if (setting == kfnAppleMode || setting == kfntheOtherMode) {
-    dummy = setting;
-    kernel_return = IOHIDSetParameter(io_connect, CFSTR(kIOHIDFKeyModeKey), &dummy, sizeof(dummy));
-    if (kernel_return != KERN_SUCCESS) {
+    CFNumberRef wrappedSetting = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &setting);
+    ret = IOHIDSetCFTypeParameter(io_connect,
+                                            CFSTR(kIOHIDFKeyModeKey),
+                                            wrappedSetting);
+    if (ret != KERN_SUCCESS) {
       IOServiceClose(io_connect);
       return -1;
     }
   }
   
   IOServiceClose(io_connect);
-  return res;
+  return 0;
 }
