@@ -1,0 +1,62 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build-and-release:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build project
+        run: |
+          xcodebuild -project fntoggle.xcodeproj \
+                    -target fntoggle \
+                    -configuration Release \
+                    BUILD_DIR=$PWD/build \
+                    clean build
+
+      - name: Prepare release artifacts
+        run: |
+          mkdir -p release
+          cp build/Release/fntoggle release/
+          chmod +x release/fntoggle
+
+      - name: Generate release tag
+        id: tag
+        run: |
+          TAG="v$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Generated tag: $TAG"
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          release_name: 'fntoggle ${{ steps.tag.outputs.tag }}'
+          body: |
+            Built from commit ${{ github.sha }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/fntoggle
+          asset_name: fntoggle
+          asset_content_type: application/octet-stream
